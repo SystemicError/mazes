@@ -104,11 +104,33 @@
                        s (set (cons antipode (grid s))))
                 grid))))))
 
-(defn maze-2d-to-str
-  "Print a 2d maze nicely."
+(defn maze-2d-to-string
+  "Render a 2d maze nicely as a string."
   [maze]
-  (let [rows (inc (apply max (map :row maze)))
-        cols (inc (apply max (map :col maze)))
-        
+  (let [rows (inc (apply max (map :row (keys maze))))
+        cols (inc (apply max (map :col (keys maze))))
+        ew (fn [cell] (if (cell :east)
+                        (if (cell :west)
+                          "-+-"
+                          " +-")
+                        (if (cell :west)
+                          "-+ "
+                          " + ")))
+        n (fn [cell] (if (cell :north) " | " "   "))
+        s (fn [cell] (if (cell :south) " | " "   "))
+        row-to-string (fn [row]
+                        (apply str
+                               (str (apply str (map n row)) \newline )
+                               (str (apply str (map ew row)) \newline )
+                               (str (apply str (map s row)) \newline )))
+        grid (for [r (range rows)]
+               (for [c (range cols)]
+                 (maze {:row r :col c})))
         ]
-    (str rows " by " cols)))
+    (apply str (map row-to-string grid))
+    ))
+
+(defn draw-2d-maze
+  "Draw a new 2d maze."
+  [rows cols]
+  (println (maze-2d-to-string (path-2d-to-walls rows cols (generate-2d-maze rows cols)))))
