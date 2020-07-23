@@ -33,8 +33,8 @@
                             (neighbors r c)))
          unvisited (fn [r c path]
                      (filter #(not ((set path) %)) (inbounds r c)))
-         dummy (println (str "\nqueue: " queue
-                             "\nstack: " stack))
+         ;dummy (println (str "\nqueue: " queue
+         ;                    "\nstack: " stack))
          ]
      (if (empty? stack)
        (let [q (first queue)
@@ -61,3 +61,54 @@
                              (rest stack))
            ; push one neighbor onto stack and queue and recur
            (generate-2d-maze rows cols (cons f queue) (cons f stack))))))))
+
+(defn path-2d-to-walls
+  "Take in a 2d path and return a map of rooms with NESW door associations."
+  ([rows cols path] (path-2d-to-walls rows cols path
+                                      (apply hash-map
+                                        (interleave
+                                          (for [r (range rows)
+                                                c (range cols)
+                                                ]
+                                            {:row r :col c})
+                                          (for [r (range rows)
+                                                c (range cols)
+                                                ]
+                                            (set nil))))))
+  ([rows cols path grid]
+   (if (or (empty? path)
+           (= (count path) 1))
+     grid ; base case
+     (let [f (first path)
+           s (first (rest path))
+           square (fn [x] (* x x))
+           distance (+ (square (- (:row f) (:row s)))
+                       (square (- (:col f) (:col s))))
+           direction (if (< (:row s) (:row f))
+                       :north
+                       (if (> (:row s) (:row f))
+                         :south
+                         (if (< (:col s) (:col f))
+                           :west
+                           :east)))
+           antipode (case direction :north :south :south :north :east :west :west :east)
+           ;dummy (println (str "Direction:" direction
+           ;                    "=?" (= distance 1)
+           ;                    "\nDistance: " distance))
+           ]
+       (recur rows cols
+              (rest path)
+              (if (= distance 1)
+                (assoc grid
+                       f (set (cons direction (grid f)))
+                       s (set (cons antipode (grid s))))
+                grid))))))
+
+(defn maze-2d-to-str
+  "Print a 2d maze nicely."
+  [maze]
+  (let [rows (inc (apply max (map :row maze)))
+        cols (inc (apply max (map :col maze)))
+        
+        ]
+    (str rows " by " cols)))
