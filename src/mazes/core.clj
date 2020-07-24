@@ -1,4 +1,6 @@
-(ns mazes.core)
+(ns mazes.core
+  (:require [quil.core :as q]
+            [quil.middleware :as m]))
 
 ; queue-stack-method:
 ;   if stack empty:
@@ -134,3 +136,110 @@
   "Draw a new 2d maze."
   [rows cols]
   (println (maze-2d-to-string (path-2d-to-walls rows cols (generate-2d-maze rows cols)))))
+
+
+
+;;; quil functions
+
+
+(defn setup []
+  ; Set frame rate to 30 frames per second.
+  (q/frame-rate 30)
+  ; Set color mode to (default) RGB.
+  (q/color-mode :rgb)
+  ; setup function returns initial state.
+  {:x 100
+   :y 100
+   :z 100
+   :azimuth 0.0
+   :maze (path-2d-to-walls 9 9 (generate-2d-maze 9 9))
+   })
+
+(defn update-state [state]
+  (let [x (:x state)
+        y (:y state)
+        z (:z state)
+        azimuth (:azimuth state)
+        pressed (q/key-as-keyword)
+        dx (* 10 (Math/cos azimuth))
+        dy (* 10 (Math/sin azimuth))
+        x (+ x (if (= pressed :w) dx 0))
+        y (+ y (if (= pressed :w) dy 0))
+        dangle (case pressed
+                 :d -0.04
+                 :a 0.04
+                 0.0)
+        ]
+    (assoc state
+           :azimuth (+ azimuth dangle)
+           :x x
+           :y y
+            )))
+
+(defn draw-maze-walls
+  "Draw the walls of a maze."
+  [maze]
+  (doseq [cell maze]
+    (let [location (first cell)
+          row (:row location)
+          col (:col location)
+          doors (first (rest cell))
+          spacing 200
+          red (rem (* (rem row 4) 64) 256)
+          green (rem (* (rem (inc row) 5) 154) 256)
+          blue (rem (* (rem row 7) 64) 256)
+          ]
+      (q/with-translation [(* col spacing) (* row spacing) 0]
+        ; fill color
+        (q/fill red green blue)
+        ; west
+        (if (not (:west doors))
+          (q/with-translation [5 (/ spacing 2) (/ spacing 2)]
+            (q/box 10 spacing spacing)))
+        ; north
+        (if (not (:north doors))
+          (q/with-translation [(/ spacing 2) 5 (/ spacing 2)]
+            (q/box spacing 10 spacing)))
+        ; east
+        (if (not (:east doors))
+          (q/with-translation [(- spacing 5) (/ spacing 2) (/ spacing 2)]
+            (q/box 10 spacing spacing)))
+        ; south
+        (if (not (:south doors))
+          (q/with-translation [(/ spacing 2) (- spacing 5) (/ spacing 2)]
+            (q/box spacing 10 spacing)))
+        ))))
+
+(defn draw-state [state]
+  (let [x (:x state)
+        y (:y state)
+        z (:z state)
+        azimuth (:azimuth state)
+        look-x (+ x (* (Math/cos azimuth) 100))
+        look-y (+ y (* (Math/sin azimuth) 100))
+        ]
+    ; Clear the sketch by filling it color
+    (q/background 240)
+    ; Set 3d mode
+    (q/camera x y z
+              look-x look-y 100
+              0 0 1)
+    (q/perspective)
+    (draw-maze-walls (:maze state))
+    ))
+
+(q/defsketch free-group
+  :title "Mazes"
+  :size [768 512]
+  ; setup function called only once, during sketch initialization.
+  :setup setup
+  ; update-state is called on each iteration before draw-state.
+  :update update-state
+  :draw draw-state
+  :renderer :p3d
+  ;:features [:keep-on-top]
+  ; This sketch uses functional-mode middleware.
+  ; Check quil wiki for more info about middlewares and particularly
+  ; fun-mode.
+  :middleware [m/fun-mode])
+
