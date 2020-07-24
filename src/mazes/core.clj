@@ -169,11 +169,16 @@
                  :d -0.04
                  :a 0.04
                  0.0)
+        dz (case pressed
+             :q 10
+             :e -10
+             0.0)
         ]
     (assoc state
            :azimuth (+ azimuth dangle)
            :x x
            :y y
+           :z (+ z dz)
             )))
 
 (defn draw-maze-walls
@@ -190,21 +195,23 @@
           blue (rem (* (rem row 7) 64) 256)
           ]
       (q/with-translation [(* col spacing) (* row spacing) 0]
-        ; fill color
-        (q/fill red green blue)
         ; west
+        (q/fill red green blue)
         (if (not (:west doors))
           (q/with-translation [5 (/ spacing 2) (/ spacing 2)]
             (q/box 10 spacing spacing)))
         ; north
+        (q/fill red blue green)
         (if (not (:north doors))
           (q/with-translation [(/ spacing 2) 5 (/ spacing 2)]
             (q/box spacing 10 spacing)))
         ; east
+        (q/fill blue red green)
         (if (not (:east doors))
           (q/with-translation [(- spacing 5) (/ spacing 2) (/ spacing 2)]
             (q/box 10 spacing spacing)))
         ; south
+        (q/fill blue green red)
         (if (not (:south doors))
           (q/with-translation [(/ spacing 2) (- spacing 5) (/ spacing 2)]
             (q/box spacing 10 spacing)))
@@ -215,8 +222,8 @@
         y (:y state)
         z (:z state)
         azimuth (:azimuth state)
-        look-x (+ x (* (Math/cos azimuth) 100))
-        look-y (+ y (* (Math/sin azimuth) 100))
+        look-x (+ x (* (Math/cos azimuth) 800))
+        look-y (+ y (* (Math/sin azimuth) 800))
         ]
     ; Clear the sketch by filling it color
     (q/background 240)
