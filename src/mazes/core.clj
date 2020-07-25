@@ -64,6 +64,59 @@
            ; push one neighbor onto stack and queue and recur
            (generate-2d-maze rows cols (cons f queue) (cons f stack))))))))
 
+(defn generate-3d-maze
+  "Generate a 3-dimensional rectangular maze."
+  ([rows cols planes] (generate-3d-maze rows cols planes (list {:row 0 :col 0 :plane 0}) (list {:row 0 :col 0 :plane 0})))
+  ([rows cols planes queue stack]
+   (let [neighbors (fn [r c p] 
+                     (list 
+                       {:row (inc r) :col c :plane p}
+                       {:row (dec r) :col c :plane p}
+                       {:row r :col (inc c) :plane p}
+                       {:row r :col (dec c) :plane p}
+                       {:row r :col c :plane (inc p)}
+                       {:row r :col c :plane (dec p)}
+                       ))
+         inbounds (fn [r c p]
+                    (filter #(and (<= 0 (:row %))
+                                  (<= 0 (:col %))
+                                  (<= 0 (:plane %))
+                                  (< (:row %) rows)
+                                  (< (:col %) cols)
+                                  (< (:plane %) planes)
+                                  )
+                            (neighbors r c p)))
+         unvisited (fn [r c p path]
+                     (filter #(not ((set path) %)) (inbounds r c p)))
+         ;dummy (println (str "\nqueue: " queue
+         ;                    "\nstack: " stack))
+         ]
+     (if (empty? stack)
+       (let [q (first queue)
+             queue-neighbors (unvisited (:row q) (:col q) (:plane q) queue)
+             f (if (empty? queue-neighbors)
+                 nil
+                 (rand-nth queue-neighbors))
+             ]
+         (if (empty? queue-neighbors)
+           ; finished, return queue
+           queue
+           ; push one neighbor onto stack and queue and recur
+           (generate-3d-maze rows cols (cons f queue) (cons f stack))))
+       (let [s (first stack)
+             stack-neighbors (unvisited (:row s) (:col s) (:plane s) (concat stack queue))
+             f (if (empty? stack-neighbors)
+                 nil
+                 (rand-nth stack-neighbors))
+             ]
+         (if (empty? stack-neighbors)
+           ; pop one off stack into queue and recur
+           (generate-3d-maze rows cols planes
+                             (cons (first stack) queue)
+                             (rest stack))
+           ; push one neighbor onto stack and queue and recur
+           (generate-3d-maze rows cols planes (cons f queue) (cons f stack))))))))
+
 (defn path-2d-to-walls
   "Take in a 2d path and return a map of rooms with NESW door associations."
   ([rows cols path] (path-2d-to-walls rows cols path
@@ -105,6 +158,56 @@
                        f (set (cons direction (grid f)))
                        s (set (cons antipode (grid s))))
                 grid))))))
+
+(defn path-3d-to-walls
+  "Take in a 3d path and return a map of rooms with NESW/Up/Down door associations."
+  ([rows cols planes path] (path-3d-to-walls rows cols planes path
+                                      (apply hash-map
+                                        (interleave
+                                          (for [r (range rows)
+                                                c (range cols)
+                                                p (range planes)
+                                                ]
+                                            {:row r :col c :plane p})
+                                          (for [r (range rows)
+                                                c (range cols)
+                                                p (range planes)
+                                                ]
+                                            (set nil))))))
+  ([rows cols planes path grid]
+   (if (or (empty? path)
+           (= (count path) 1))
+     grid ; base case
+     (let [f (first path)
+           s (first (rest path))
+           square (fn [x] (* x x))
+           distance (+ (square (- (:row f) (:row s)))
+                       (square (- (:col f) (:col s)))
+                       (square (- (:plane f) (:plane s))))
+           direction (if (< (:row s) (:row f))
+                       :north
+                       (if (> (:row s) (:row f))
+                         :south
+                         (if (< (:col s) (:col f))
+                           :west
+                           (if (> (:col s) (:col f))
+                             :east
+                             (if (< (:plane s) (:plane f))
+                               :down
+                               :up)))))
+           antipode (case direction :north :south :south :north :east :west :west :east :up :down :down :up)
+           ;dummy (println (str "Direction:" direction
+           ;                    "=?" (= distance 1)
+           ;                    "\nDistance: " distance))
+           ]
+       (recur rows cols planes
+              (rest path)
+              (if (= distance 1)
+                (assoc grid
+                       f (set (cons direction (grid f)))
+                       s (set (cons antipode (grid s))))
+                grid))))))
+
 
 (defn maze-2d-to-string
   "Render a 2d maze nicely as a string."
@@ -152,7 +255,7 @@
    :y 100
    :z 100
    :azimuth 0.0
-   :maze (path-2d-to-walls 9 9 (generate-2d-maze 9 9))
+   :maze (path-3d-to-walls 6 6 6 (generate-3d-maze 6 6 6))
    })
 
 (defn update-state [state]
@@ -188,13 +291,14 @@
     (let [location (first cell)
           row (:row location)
           col (:col location)
+          plane (:plane location)
           doors (first (rest cell))
           spacing 200
           red (rem (* (rem row 4) 64) 256)
           green (rem (* (rem (inc row) 5) 154) 256)
           blue (rem (* (rem row 7) 64) 256)
           ]
-      (q/with-translation [(* col spacing) (* row spacing) 0]
+      (q/with-translation [(* col spacing) (* row spacing) (* plane spacing)]
         ; west
         (q/fill red green blue)
         (if (not (:west doors))
@@ -215,6 +319,16 @@
         (if (not (:south doors))
           (q/with-translation [(/ spacing 2) (- spacing 5) (/ spacing 2)]
             (q/box spacing 10 spacing)))
+        ; up 
+        (q/fill green red blue)
+        (if (not (:down doors))
+          (q/with-translation [(/ spacing 2) (/ spacing 2) 5]
+            (q/box spacing spacing 10)))
+        ; down
+        (q/fill green blue red)
+        (if (not (:up doors))
+          (q/with-translation [(/ spacing 2) (/ spacing 2) (- spacing 5)]
+            (q/box spacing spacing 10)))
         ))))
 
 (defn draw-state [state]
@@ -224,12 +338,13 @@
         azimuth (:azimuth state)
         look-x (+ x (* (Math/cos azimuth) 800))
         look-y (+ y (* (Math/sin azimuth) 800))
+        look-z z
         ]
     ; Clear the sketch by filling it color
     (q/background 240)
     ; Set 3d mode
     (q/camera x y z
-              look-x look-y 100
+              look-x look-y look-z
               0 0 1)
     (q/perspective)
     (draw-maze-walls (:maze state))
