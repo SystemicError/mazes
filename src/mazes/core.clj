@@ -244,6 +244,7 @@
 
 ;;; quil functions
 
+(def spacing 250)
 
 (defn setup []
   ; Set frame rate to 30 frames per second.
@@ -251,9 +252,9 @@
   ; Set color mode to (default) RGB.
   (q/color-mode :rgb)
   ; setup function returns initial state.
-  {:x 100
-   :y 100
-   :z 100
+  {:x (/ spacing 2)
+   :y (/ spacing 2)
+   :z (/ spacing 2)
    :azimuth 0.0
    :maze (path-3d-to-walls 6 6 6 (generate-3d-maze 6 6 6))
    })
@@ -266,8 +267,8 @@
         pressed (q/key-as-keyword)
         dx (* 10 (Math/cos azimuth))
         dy (* 10 (Math/sin azimuth))
-        x (+ x (if (= pressed :w) dx 0))
-        y (+ y (if (= pressed :w) dy 0))
+        new-x (+ x (if (= pressed :w) dx 0))
+        new-y (+ y (if (= pressed :w) dy 0))
         dangle (case pressed
                  :d -0.04
                  :a 0.04
@@ -279,8 +280,8 @@
         ]
     (assoc state
            :azimuth (+ azimuth dangle)
-           :x x
-           :y y
+           :x new-x
+           :y new-y
            :z (+ z dz)
             )))
 
@@ -293,42 +294,42 @@
           col (:col location)
           plane (:plane location)
           doors (first (rest cell))
-          spacing 200
-          red (rem (* (rem row 4) 64) 256)
-          green (rem (* (rem (inc row) 5) 154) 256)
-          blue (rem (* (rem row 7) 64) 256)
+          red (+ 128 (rem (* (rem row 4) 64) 128))
+          green (+ 128 (rem (* (rem (inc row) 5) 154) 128))
+          blue (+ 128 (rem (* (rem row 7) 64) 128))
+          thickness 5
           ]
       (q/with-translation [(* col spacing) (* row spacing) (* plane spacing)]
         ; west
         (q/fill red green blue)
         (if (not (:west doors))
-          (q/with-translation [5 (/ spacing 2) (/ spacing 2)]
-            (q/box 10 spacing spacing)))
+          (q/with-translation [(/ thickness 2) (/ spacing 2) (/ spacing 2)]
+            (q/box thickness spacing spacing)))
         ; north
         (q/fill red blue green)
         (if (not (:north doors))
-          (q/with-translation [(/ spacing 2) 5 (/ spacing 2)]
-            (q/box spacing 10 spacing)))
+          (q/with-translation [(/ spacing 2) (/ thickness 2) (/ spacing 2)]
+            (q/box spacing thickness spacing)))
         ; east
         (q/fill blue red green)
         (if (not (:east doors))
-          (q/with-translation [(- spacing 5) (/ spacing 2) (/ spacing 2)]
-            (q/box 10 spacing spacing)))
+          (q/with-translation [(- spacing (/ thickness 2)) (/ spacing 2) (/ spacing 2)]
+            (q/box thickness spacing spacing)))
         ; south
         (q/fill blue green red)
         (if (not (:south doors))
-          (q/with-translation [(/ spacing 2) (- spacing 5) (/ spacing 2)]
-            (q/box spacing 10 spacing)))
+          (q/with-translation [(/ spacing 2) (- spacing (/ thickness 2)) (/ spacing 2)]
+            (q/box spacing thickness spacing)))
         ; up 
         (q/fill green red blue)
         (if (not (:down doors))
-          (q/with-translation [(/ spacing 2) (/ spacing 2) 5]
-            (q/box spacing spacing 10)))
+          (q/with-translation [(/ spacing 2) (/ spacing 2) (/ thickness 2)]
+            (q/box spacing spacing thickness)))
         ; down
         (q/fill green blue red)
         (if (not (:up doors))
-          (q/with-translation [(/ spacing 2) (/ spacing 2) (- spacing 5)]
-            (q/box spacing spacing 10)))
+          (q/with-translation [(/ spacing 2) (/ spacing 2) (- spacing (/ thickness 2))]
+            (q/box spacing spacing thickness)))
         ))))
 
 (defn draw-state [state]
