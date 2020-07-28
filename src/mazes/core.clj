@@ -242,9 +242,49 @@
 
 
 
-;;; quil functions
+(def spacing 300)
 
-(def spacing 250)
+;;; matrix functions
+
+(defn rot-x
+  [angle]
+  "Return a rotation matrix about the x-axis."
+  (let [c (Math/cos angle)
+	s (Math/sin angle)
+	]
+    (list (list 1 0 0)
+          (list 0 c (* -1 s))
+          (list 0 s c))))
+
+(defn rot-y
+  [angle]
+  "Return a rotation matrix about the y-axis."
+  (let [c (Math/cos angle)
+	s (Math/sin angle)
+	]
+    (list (list c 0 (* -1 s))
+          (list 0 1 0)
+          (list s 0 c))))
+
+(defn rot-z
+  [angle]
+  "Return a rotation matrix about the x-axis."
+  (let [c (Math/cos angle)
+	s (Math/sin angle)
+	]
+    (list (list c (* -1 s) 0)
+          (list s c 0)
+	  (list 0 0 1))))
+
+(defn matrix-multiply
+  [a b]
+  (for [row (range (count a))]
+    (for [col (range (count (first b)))]
+      (reduce + (map *
+                     (nth a row)
+                     (map #(nth % col) b))))))
+
+;;; quil functions
 
 (defn setup []
   ; Set frame rate to 30 frames per second.
