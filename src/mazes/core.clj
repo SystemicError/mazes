@@ -284,45 +284,77 @@
                      (nth a row)
                      (map #(nth % col) b))))))
 
+(defn matrix-transpose
+  [m]
+  (for [col (range (count (first m)))]
+    (for [row (range (count m))]
+      (nth (nth m row) col))))
+
 ;;; quil functions
 
 (defn setup []
-  ; Set frame rate to 30 frames per second.
-  (q/frame-rate 30)
-  ; Set color mode to (default) RGB.
-  (q/color-mode :rgb)
-  ; setup function returns initial state.
-  {:x (/ spacing 2)
-   :y (/ spacing 2)
-   :z (/ spacing 2)
-   :azimuth 0.0
-   :maze (path-3d-to-walls 6 6 6 (generate-3d-maze 6 6 6))
-   })
+  (let [maze (path-3d-to-walls 2 2 2 (generate-3d-maze 2 2 2))
+        cell {:row 1 :col 1 :plane 1}
+        doors (set (cons :south (maze cell)))
+        open-maze (assoc maze cell doors)
+        dummy (println (str (into [] maze)))
+        dummy (println (str (into [] open-maze)))
+       ]
+    ; Set frame rate to 30 frames per second.
+    (q/frame-rate 30)
+    ; Set color mode to (default) RGB.
+    (q/color-mode :rgb)
+    ; setup function returns initial state.
+    {:position (list (/ spacing 2) (/ spacing 2) (/ spacing 2))
+     :look (list 3 0 0)
+     :up (list 0 0 3)
+     :maze open-maze
+     :rotation (list (list 1 0 0) (list 0 1 0) (list 0 0 1))
+     :inverse-rotation (list (list 1 0 0) (list 0 1 0) (list 0 0 1))
+     }))
 
 (defn update-state [state]
-  (let [x (:x state)
-        y (:y state)
-        z (:z state)
-        azimuth (:azimuth state)
+  (let [position (:position state)
+        look (:look state)
+        up (:up state)
         pressed (q/key-as-keyword)
-        dx (* 10 (Math/cos azimuth))
-        dy (* 10 (Math/sin azimuth))
-        new-x (+ x (if (= pressed :w) dx 0))
-        new-y (+ y (if (= pressed :w) dy 0))
-        dangle (case pressed
-                 :d -0.04
-                 :a 0.04
-                 0.0)
-        dz (case pressed
-             :q 10
-             :e -10
-             0.0)
+        new-position (if (= pressed :x)
+                       (map + position look)
+                       position)
+        rotation (:rotation state)
+        inverse-rotation (:inverse-rotation state)
+        dangle 0.05
+        new-rotation (case pressed
+	               :a (matrix-multiply rotation (rot-z (* 1 dangle)))
+                       :d (matrix-multiply rotation (rot-z (* -1 dangle)))
+	               :w (matrix-multiply rotation (rot-y (* 1 dangle)))
+                       :s (matrix-multiply rotation (rot-y (* -1 dangle)))
+                       :q (matrix-multiply rotation (rot-x (* 1 dangle)))
+                       :e (matrix-multiply rotation (rot-x (* -1 dangle)))
+                       rotation)
+        new-inverse-rotation (case pressed
+	                      :a (matrix-multiply (rot-z (* -1 dangle)) inverse-rotation)
+                              :d (matrix-multiply (rot-z (* 1 dangle)) inverse-rotation)
+	                      :w (matrix-multiply (rot-y (* -1 dangle)) inverse-rotation)
+                              :s (matrix-multiply (rot-y (* 1 dangle)) inverse-rotation)
+                              :q (matrix-multiply (rot-x (* -1 dangle)) inverse-rotation)
+                              :e (matrix-multiply (rot-x (* 1 dangle)) inverse-rotation)
+                              inverse-rotation)
+        vector-inputs (matrix-transpose (list look up))
+        rotated (matrix-multiply (matrix-multiply new-rotation inverse-rotation) vector-inputs)
+        vector-outputs (matrix-transpose rotated)
+        new-look (first vector-outputs)
+        new-up (nth vector-outputs 1)
+        ;dummy (println (str "new-up:" (into [] new-up)
+        ;                    "\nnew-look:" (into [] new-look)
+        ;                    "\nnewrot*newinvrot:" (into [] (matrix-multiply new-rotation new-inverse-rotation))))
         ]
     (assoc state
-           :azimuth (+ azimuth dangle)
-           :x new-x
-           :y new-y
-           :z (+ z dz)
+           :position new-position
+           :look new-look
+           :up new-up
+           :rotation new-rotation
+           :inverse-rotation new-inverse-rotation
             )))
 
 (defn draw-maze-walls
@@ -373,20 +405,14 @@
         ))))
 
 (defn draw-state [state]
-  (let [x (:x state)
-        y (:y state)
-        z (:z state)
-        azimuth (:azimuth state)
-        look-x (+ x (* (Math/cos azimuth) 800))
-        look-y (+ y (* (Math/sin azimuth) 800))
-        look-z z
+  (let [position (:position state)
+        look (:look state)
+        up (:up state)
         ]
     ; Clear the sketch by filling it color
     (q/background 240)
     ; Set 3d mode
-    (q/camera x y z
-              look-x look-y look-z
-              0 0 1)
+    (apply q/camera (concat position (map + look position) up))
     (q/perspective)
     (draw-maze-walls (:maze state))
     ))
