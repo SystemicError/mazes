@@ -243,6 +243,7 @@
 
 
 (def spacing 300)
+(def thickness 5)
 
 ;;; matrix functions
 
@@ -290,6 +291,68 @@
     (for [row (range (count m))]
       (nth (nth m row) col))))
 
+;;; collision detection
+
+(defn position-to-grid-coord
+  "Convert the float for the position x/y/z to the row/col/plane in the grid."
+  [position]
+  (map #(if (> 0 %)
+            -1
+            (int (/ % spacing))) position))
+
+(defn inbounds [position doors new-position new-doors]
+  "Return true if inbounds, false if out of bounds."
+  (let [coords (position-to-grid-coord position)
+        new-coords (position-to-grid-coord new-position)
+        x (rem (first new-position) spacing)
+        y (rem (nth new-position 1) spacing)
+        z (rem (nth new-position 2) spacing)
+        ;dummy (println (str ;"\nx/y/z:" x ", " y ", " z
+        ;                    "position:" (into [] position)
+        ;                    "new-position:" (into [] new-position)
+        ;                    "\ncoords:" (into [] coords)
+        ;                    "\nnew-coords:" (into [] new-coords)
+        ;                    "\ndoors" (into [] doors)
+        ;                    "\nwest:" (or (:west doors) (> x thickness))
+        ;                    "\neast:" (or (:east doors) (< x (- spacing thickness)))
+        ;                    "\nnorth:" (or (:north doors) (> y thickness))
+        ;                    "\nsouth:" (or (:south doors) (< y (- spacing thickness)))
+        ;                    "\nup:" (or (:up doors) (> z thickness))
+        ;                    "\ndown" (or (:down doors) (< z (- spacing thickness)))
+        ;                    "\nsame cell" (= (position-to-grid-coord position)
+        ;                                     (position-to-grid-coord new-position))
+        ;                ))
+       ]
+    (if (= coords new-coords)
+      true;(and (or (:west doors)
+      ;         (> x thickness))
+      ;     (or (:east doors)
+      ;         (< x (- spacing thickness)))
+      ;     (or (:north doors)
+      ;         (> y thickness))
+      ;     (or (:south doors)
+      ;         (< y (- spacing thickness)))
+      ;     (or (:up doors)
+      ;         (> z thickness))
+      ;     (or (:down doors)
+      ;         (< z (- spacing thickness))))
+      ; we change cells
+      (let [diffs (map - new-coords coords)
+            dx (first diffs)
+            dy (nth diffs 1)
+            dz (nth diffs 2)
+            ;dummy (println (str "\ndx/dy/dz: " dx dy dz
+            ;                    "\ndoors: " (into [] doors)))
+            ]
+        (or (and (:west doors) (= dx -1))
+            (and (:east doors) (= dx 1))
+            (and (:south doors) (= dy 1))
+            (and (:north doors) (= dy -1))
+            (and (:up doors) (= dz 1))
+            (and (:down doors) (= dz -1))
+        )))))
+    
+
 ;;; quil functions
 
 (defn setup []
@@ -318,7 +381,21 @@
         look (:look state)
         up (:up state)
         pressed (q/key-as-keyword)
-        new-position (if (= pressed :x)
+        coords (map #(int (/ % spacing)) position)
+        doors ((:maze state) {:col (first coords)
+                              :row (nth coords 1)
+                              :plane (nth coords 2)})
+        ;dummy (println (str "\ncoords" (into [] coords)
+        ;                    "\ndoors" (into [] doors)
+        ;                    "\nposition" (into [] position)
+        ;                ))
+        new-coords (map #(int (/ % spacing)) (map + position look))
+        new-cell {:col (first new-coords)
+                  :row (nth new-coords 1)
+                  :plane (nth new-coords 2)}
+        new-doors ((:maze state) new-cell)
+        new-position (if (and (= pressed :x)
+                              (inbounds position doors (map + position look) new-doors))
                        (map + position look)
                        position)
         rotation (:rotation state)
@@ -345,8 +422,10 @@
         vector-outputs (matrix-transpose rotated)
         new-look (first vector-outputs)
         new-up (nth vector-outputs 1)
-        ;dummy (println (str "new-up:" (into [] new-up)
+        ;dummy (println (str ;"new-up:" (into [] new-up)
         ;                    "\nnew-look:" (into [] new-look)
+        ;                    "\ncoords" (into [] coords)
+        ;                    "\ndoors" (into [] doors)
         ;                    "\nnewrot*newinvrot:" (into [] (matrix-multiply new-rotation new-inverse-rotation))))
         ]
     (assoc state
@@ -369,36 +448,35 @@
           red (+ 128 (rem (* (rem row 4) 64) 128))
           green (+ 128 (rem (* (rem (inc row) 5) 154) 128))
           blue (+ 128 (rem (* (rem row 7) 64) 128))
-          thickness 5
           ]
       (q/with-translation [(* col spacing) (* row spacing) (* plane spacing)]
         ; west
-        (q/fill red green blue)
+        (q/fill red 0 0)
         (if (not (:west doors))
           (q/with-translation [(/ thickness 2) (/ spacing 2) (/ spacing 2)]
             (q/box thickness spacing spacing)))
         ; north
-        (q/fill red blue green)
+        (q/fill 0 blue 0)
         (if (not (:north doors))
           (q/with-translation [(/ spacing 2) (/ thickness 2) (/ spacing 2)]
             (q/box spacing thickness spacing)))
         ; east
-        (q/fill blue red green)
+        (q/fill 0 blue green)
         (if (not (:east doors))
           (q/with-translation [(- spacing (/ thickness 2)) (/ spacing 2) (/ spacing 2)]
             (q/box thickness spacing spacing)))
         ; south
-        (q/fill blue green red)
+        (q/fill red 0 green)
         (if (not (:south doors))
           (q/with-translation [(/ spacing 2) (- spacing (/ thickness 2)) (/ spacing 2)]
             (q/box spacing thickness spacing)))
         ; up 
-        (q/fill green red blue)
+        (q/fill 0 0 blue)
         (if (not (:down doors))
           (q/with-translation [(/ spacing 2) (/ spacing 2) (/ thickness 2)]
             (q/box spacing spacing thickness)))
         ; down
-        (q/fill green blue red)
+        (q/fill red green 0)
         (if (not (:up doors))
           (q/with-translation [(/ spacing 2) (/ spacing 2) (- spacing (/ thickness 2))]
             (q/box spacing spacing thickness)))
